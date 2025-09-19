@@ -10,11 +10,6 @@ For this workshop, you have two options for your development environment:
 
 ## AWS Workshop Studio environment (for AWS-run events)
 
-
-Currently under construction!
-
-The workshop studio environment is currently under construction. Please use your local dev in the meantime. If you have any questions, please contact Daniel Wirjo ([wirjo@amazon.com](mailto:wirjo@amazon.com) ).
-
 If you're attending an AWS-run event, we recommend using the provided cloud-based Visual Studio Code Server environment. This environment comes pre-configured with all the necessary tools and AWS credentials.
 
 
@@ -50,10 +45,19 @@ Even though the Workshop Studio environment comes pre-configured, you'll need to
     cd voice-agent
     ```
     
+2. You'll need Python 3.12 or newer for this lab. You can check your existing version by running `python --version` in a terminal. If you have an older version of Python, you can install Python 3.12 by running:
+    ```
+    sudo dnf install -y python3.12
+    ```
+    The `sudo` password is the same password you used to log in to the VS Code cloud environment.
+
 3. Create a virtual environment.
     
     ```
+    # If you already have a new version of Python:
     python -m venv venv
+    # If you had to install Python 3.12:
+    python3.12 -m venv venv
     ```
     
 4. Activate the virtual environment.
@@ -67,7 +71,13 @@ Even though the Workshop Studio environment comes pre-configured, you'll need to
 ### AWS Credentials in the Workshop Environment
 
 
-The AWS Workshop Studio environment comes with AWS credentials pre-configured. You don't need to set up any additional credentials to get started.
+The AWS Workshop Studio environment comes with AWS credentials pre-configured. You'll need those credentials for your .env file in a later step.
+
+To run this lab in the cloud VS Code environment, you'll need to use the Daily transport, which means you'll need a Daily API key. If you're running this lab at an AWS event, you'll be given a Daily API key to use.
+
+If you plan to deploy your bot to Pipecat Cloud, you can sign up for an account at [pipecat.daily.co](https://pipecat.daily.co). Your Pipecat account includes a Daily API key [in the dashboard](https://pipecat.daily.co/qventus-poc/settings/keys#daily).
+
+If you're not deploying to Pipecat Cloud, you can sign up for a free Daily account at [daily.co](https://daily.co). You'll need to enter a credit card to get started, but you get plenty of free minutes to use with this lab.
 
 
 ## Next Steps

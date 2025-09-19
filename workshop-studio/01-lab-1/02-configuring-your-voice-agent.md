@@ -100,7 +100,7 @@ The pipeline architecture makes Pipecat highly extensible, allowing you to add, 
         async def on_client_connected(transport, client):
             logger.info(f"Client connected")
             # Kick off the conversation
-            await task.queue_frames([context_aggregator.user().get_context_frame()])
+            await task.queue_frames([LLMRunFrame()])
             # Trigger the first assistant response
             await llm.trigger_assistant_response()
     
@@ -150,26 +150,59 @@ The pipeline execution is a critical part of your voice agent:
 
 This asynchronous execution model allows your voice agent to process audio input, generate responses, and handle function calls all in real-time while maintaining a responsive user experience.
 
-6. Add the main entry point to your `agent.py` file:
+6. Add the `bot()` function and main entry point to your `agent.py` file:
     
     ```python
+    async def bot(runner_args: RunnerArguments):
+        """Main bot entry point for the bot starter."""
+
+        transport_params = {
+            "daily": lambda: DailyParams(
+                audio_in_enabled=True,
+                audio_out_enabled=True,
+                vad_analyzer=SileroVADAnalyzer(),
+            ),
+            "webrtc": lambda: TransportParams(
+                audio_in_enabled=True,
+                audio_out_enabled=True,
+                vad_analyzer=SileroVADAnalyzer(),
+            ),
+        }
+
+        transport = await create_transport(runner_args, transport_params)
+
+        await run_bot(transport, runner_args)
+
+
     if __name__ == "__main__":
-        from run import main
-    
+        from pipecat.runner.run import main
+
         main()
     ```
     
 
-Understanding the Entry Point
+### Running your bot.
 
-This entry point structure follows Python's best practices for creating executable modules:
+To run your bot, you need two things:
 
-- The `if __name__ == "__main__":` condition ensures this code only runs when the file is executed directly (not when imported)
-- Importing `main()` from `run.py` keeps the agent logic separate from the server initialization code
-- This separation of concerns makes your code more maintainable and easier to test
-- When you run `python agent.py`, this entry point will trigger the entire application startup process
+1. A way to trigger and manage a new bot session
+2. A transport for sending and receiving audio (and video) between the bot and the user
 
-This pattern allows your agent to be both a standalone application and a reusable module that can be imported into other projects.
+The Pipecat framework includes a `runner` module that handles the first part for you. It follows the same pattern as [Pipecat Cloud](https://docs.pipecat.ai/deployment/pipecat-cloud/introduction): When you run your botfile, the runner preloads your code. When you're ready to start a session, the runner calls the `bot()` function to set up a transport and start the session.
+
+This `bot()` function includes configuration for both `SmallWebRTCTransport` and `DailyTransport`. The `if __name__ == "__main__":` condition is a Python convention that manages what happens when you run this file directly from the terminal. The `main()` function from the runner module parses some predefined command line arguments, so you can choose which transport you want to use when you run the bot. We'll explore runner options in the next section.
+
+
+TKTKTK Should this move somewhere else?
+
+### Understanding VAD and Silero
+
+The **Voice Activity Detection (VAD)** analyzer helps detect when the user has finished speaking, with a silence threshold of 0.8 seconds.
+    
+- _Voice Activity Detection (VAD)_ is a technology used to detect the presence or absence of human speech in audio. In voice AI applications, VAD is crucial for determining when a user has started or stopped speaking, allowing the system to process speech input at appropriate times.
+    
+- _Silero VAD_ is a specific implementation of voice activity detection that uses deep learning models to accurately detect speech segments in audio streams. It's particularly effective at distinguishing between speech and background noise, making it ideal for real-time voice applications. The `stop_secs` parameter (set to 0.8 seconds in our code) defines how long the system should wait after detecting silence before considering that the user has finished speaking.
+    
 
 ## Next steps
 

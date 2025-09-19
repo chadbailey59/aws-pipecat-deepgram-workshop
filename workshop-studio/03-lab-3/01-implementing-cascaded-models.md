@@ -38,7 +38,6 @@ from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -48,25 +47,14 @@ from pipecat.services.aws.tts import AWSPollyTTSService
 from pipecat.services.aws.llm import AWSBedrockLLMService
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.network.small_webrtc import SmallWebRTCTransport
-from pipecat.transports.network.webrtc_connection import SmallWebRTCConnection
+from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 
 # Load environment variables
 load_dotenv()
 
-async def run_bot(webrtc_connection, args):
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
+
     logger.info("Starting cascaded bot")
-    
-    # Initialize the SmallWebRTCTransport with the connection
-    transport = SmallWebRTCTransport(
-        webrtc_connection=webrtc_connection,
-        params=TransportParams(
-            audio_in_enabled=True,
-            audio_in_sample_rate=16000,
-            audio_out_enabled=True,
-            camera_in_enabled=False,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.8)),
-        ),
-    )
     
     # Initialize speech-to-text service
     stt = AWSTranscribeSTTService(
@@ -151,7 +139,7 @@ async def run_bot(webrtc_connection, args):
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
         # Kick off the conversation
-        await task.queue_frames([context_aggregator.user().get_context_frame()])
+        await task.queue_frames([LLMRunFrame()])
         # Trigger the first assistant response
         await llm.trigger_assistant_response()
 
@@ -181,8 +169,7 @@ Now that we've created our cascaded agent, let's run it using the run.py script 
 1. Run your cascaded agent with the following command:
 
 ```bash
-1
-python run.py cascaded_agent.py
+python cascaded_agent.py -t daily # or -t webrtc
 ```
 
 2. You should see output indicating that the WebRTC server has started and is listening for connections.

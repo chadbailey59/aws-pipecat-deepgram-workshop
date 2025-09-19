@@ -28,7 +28,6 @@ For our simple example, we'll implement web retrieval using googlesearch-python.
 First, let's install the necessary packages:
 
 ```bash
-1
 pip install googlesearch-python requests beautifulsoup4
 ```
 
@@ -261,8 +260,7 @@ To test the knowledge retrieval capability:
 1. Run your new agent with the following command:
 
 ```bash
-1
-python run.py agent_retrieval.py
+python agent_retrieval.py -t daily # or -t webrtc
 ```
 
 2. Open your browser and navigate to [http://localhost:7860](http://localhost:7860/)  to access the voice interface.

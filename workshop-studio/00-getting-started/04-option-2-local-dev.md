@@ -63,25 +63,12 @@ Workshop Credentials
 
 If you're attending an AWS-hosted workshop event, you can retrieve your AWS credentials from the [Event Dashboard](https://prod.workshops.aws/event/dashboard/en-US)  under the "Event Outputs" section. You'll find your `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` there.
 
-1. Create a `.env` file in your project directory.
-    
-    ```
-    touch .env
-    ```
-    
-2. Add your AWS credentials to the `.env` file.
-    
-    ```
-    AWS_ACCESS_KEY_ID=your_access_key_id
-    AWS_SECRET_ACCESS_KEY=your_secret_access_key
-    AWS_REGION=us-east-1
-    ```
-    
-3. Add your `.env` file to `.gitignore`.
-    
-    ```
-    echo ".env" >> .gitignore
-    ```
+If you're running the lab locally, you can use the built-in 'small WebRTC transport' for initial development. To deploy your bot, you'll need the Daily transport (or something similar). If you're running this lab at an AWS event, you'll be given a Daily API key to use.
+
+If you plan to deploy your bot to Pipecat Cloud, you can sign up for an account at [pipecat.daily.co](https://pipecat.daily.co). Your Pipecat account includes a Daily API key [in the dashboard](https://pipecat.daily.co/qventus-poc/settings/keys#daily).
+
+If you're not deploying to Pipecat Cloud, you can sign up for a free Daily account at [daily.co](https://daily.co). You'll need to enter a credit card to get started, but you get plenty of free minutes to use with this lab.
+
     
 
 
