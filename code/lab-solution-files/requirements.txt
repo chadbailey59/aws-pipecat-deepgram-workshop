@@ -1,7 +1,7 @@
 pipecat-ai[webrtc,daily,silero,aws-nova-sonic]==0.0.85
 pipecat-ai-small-webrtc-prebuilt
 python-dotenv
-boto3
+aioboto3
 
 # lab 2
 googlesearch-python
