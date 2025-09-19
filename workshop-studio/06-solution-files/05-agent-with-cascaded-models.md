@@ -1,31 +1,6 @@
-# Implementing the cascaded models approach
+# Agent with cascaded models
 
-While Amazon Nova Sonic provides a direct speech-to-speech approach, there are scenarios where a cascaded models approach might be more appropriate. In this section, we'll implement this alternative approach.
-
-## What is the cascaded models approach?
-
-The cascaded models approach breaks down voice AI processing into separate components:
-
-1. **Speech-to-Text (STT)**: Converts spoken language into written text
-2. **Large Language Model (LLM)**: Processes the text and generates a response
-3. **Text-to-Speech (TTS)**: Converts the text response back into spoken language
-
-This approach offers more flexibility and control over each step of the process.
-
-![Reference Architecture - Cascaded Models](https://d2908q01vomqb2.cloudfront.net/f1f836cb4ea6efb2a0b1b99f41ad8b103eff4b59/2025/05/09/Reference-Architecture-Pipecat.png)
-
-## Implementing the cascaded approach
-
-1. First, let's install the required dependency:
-
-```bash
-1
-pip install "pipecat-ai[aws]"==0.0.67
-```
-
-Let's create a cascaded version of our voice AI agent:
-
-2. Create a file named `agent_cascaded.py`:
+## agent_cascaded.py
 
 ```python
 import argparse
@@ -55,7 +30,6 @@ load_dotenv()
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     logger.info("Starting cascaded bot")
-    
     # Initialize speech-to-text service
     stt = AWSTranscribeSTTService(
         api_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
@@ -161,22 +135,3 @@ if __name__ == "__main__":
     from run import main
     main()
 ```
-
-## Running your cascaded agent
-
-Now that we've created our cascaded agent, let's run it using the run.py script we created earlier:
-
-1. Run your cascaded agent with the following command:
-
-```bash
-python cascaded_agent.py -t daily # or -t webrtc
-```
-
-2. You should see output indicating that the WebRTC server has started and is listening for connections.
-    
-3. Open your browser and navigate to [http://localhost:7860](http://localhost:7860/)  to access the voice interface.
-    
-
-## Next steps
-
-Now that we've implemented the cascaded approach, let's compare the approaches.

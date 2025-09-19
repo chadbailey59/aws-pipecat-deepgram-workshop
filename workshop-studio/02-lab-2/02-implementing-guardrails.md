@@ -345,7 +345,7 @@ To test the off-topic handling and emergency escalation capabilities:
 
 ```bash
 1
-python run.py agent_guardrail.py
+python agent_guardrail.py -t daily # or -t webrtc
 ```
 
 2. Open your browser and navigate to [http://localhost:7860](http://localhost:7860/)  to access the voice interface.

@@ -54,14 +54,12 @@ This differs from the direct integration approach we saw earlier, where our appl
 1. First, install the required dependencies for Strands:
 
 ```bash
-1
 pip install strands-agents strands-agents-tools
 ```
 
 2. Second, install the required dependencies for the [AWS Location Service MCP Server](https://awslabs.github.io/mcp/servers/aws-location-mcp-server/) . You will be installing this MCP server locally.
 
 ```bash
-1
 pip install uv
 ```
 
@@ -221,7 +219,6 @@ from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -230,7 +227,7 @@ from pipecat.services.aws_nova_sonic import AWSNovaSonicLLMService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.transports.base_transport import TransportParams
 from pipecat.transports.network.small_webrtc import SmallWebRTCTransport
-from pipecat.transports.network.webrtc_connection import SmallWebRTCConnection
+from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 
 # Load environment variables
 load_dotenv(override=True)
@@ -279,20 +276,9 @@ query_function = FunctionSchema(
 # Create tools schema
 tools = ToolsSchema(standard_tools=[query_function])
 
-async def run_bot(webrtc_connection: SmallWebRTCConnection, _: argparse.Namespace):
-    logger.info(f"Starting bot with Strands agent integration")
+async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
-    # Initialize the SmallWebRTCTransport with the connection
-    transport = SmallWebRTCTransport(
-        webrtc_connection=webrtc_connection,
-        params=TransportParams(
-            audio_in_enabled=True,
-            audio_in_sample_rate=16000,
-            audio_out_enabled=True,
-            camera_in_enabled=False,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.8)),
-        ),
-    )
+    logger.info(f"Starting bot with Strands agent integration")
     
     # Initialize services
     llm = AWSNovaSonicLLMService(
@@ -354,7 +340,7 @@ async def run_bot(webrtc_connection: SmallWebRTCConnection, _: argparse.Namespac
     async def on_client_connected(transport, client):
         logger.info(f"Client connected")
         # Kick off the conversation
-        await task.queue_frames([context_aggregator.user().get_context_frame()])
+        await task.queue_frames([LLMRunFrame()])
         # Trigger the first assistant response
         await llm.trigger_assistant_response()
 
@@ -384,8 +370,7 @@ Now that we've created our delegated agent, let's run it using the run.py script
 1. Run your delegated agent with the following command:
     
     ```bash
-    1
-    python run.py agent_delegated.py
+    python agent_delegated.py -t daily # or -t webrtc
     ```
     
 2. You should see output indicating that the WebRTC server has started and is listening for connections.

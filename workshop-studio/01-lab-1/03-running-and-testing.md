@@ -4,26 +4,26 @@
 
 Now that you've built your voice agent and created the run script, it's time to run it:
 
-1. Run your voice agent with the following command:
+1. Run your voice agent with one of the following commands, depending which transport you're using:
     
     ```bash
-    python run.py agent.py
+    # To use Daily
+    python agent.py -t daily
+    # To use SmallWebRTCTransport
+    python agent.py -t webrtc
     ```
+
+TKTKTK check the webrtc runner thing
     
 
 Initial Loading Time
 
-It may take up to 2 minutes for the agent to first load up. This is normal as the system initializes all the necessary components and establishes connections to the required services.
+It may take up to 2 minutes for the agent to first load up. This is normal as the system initializes all the necessary components, downloads the Silero model and runtime, and establishes connections to the required services.
 
-2. You should see output indicating that the WebRTC server has started and is listening for connections.
+2. You should see output indicating that the runner server has started and is listening for connections.
     
     The server will start on port 7860 by default. Once it's running, you can access the voice agent interface at [http://localhost:7860](http://localhost:7860/) .
     
-    You can specify a different port using the `--port` option:
-    
-    ```bash
-    python run.py agent.py --port 9090
-    ```
     
 3. When a client connects, your agent will automatically start the conversation with "Tell me a fun fact!" and respond accordingly.
     

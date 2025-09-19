@@ -14,33 +14,37 @@ touch agent.py
 
 ```python
 # agent.py
-import argparse
 import os
 from datetime import datetime
 
 from dotenv import load_dotenv
 from loguru import logger
-
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.audio.vad.vad_analyzer import VADParams
+from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.runner.types import RunnerArguments
+from pipecat.runner.utils import create_transport
 from pipecat.services.aws_nova_sonic import AWSNovaSonicLLMService
 from pipecat.services.llm_service import FunctionCallParams
-from pipecat.transports.base_transport import TransportParams
-from pipecat.transports.network.small_webrtc import SmallWebRTCTransport
-from pipecat.transports.network.webrtc_connection import SmallWebRTCConnection
+from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.transports.daily.transport import DailyParams
 ```
+
+TKTKTK Check imports with new botfile!
 
 Did you know that Pipecat supports multiple transport options?
 
-In this workshop, you will be using [SmallWebRTCTransport](https://docs.pipecat.ai/server/services/transport/small-webrtc)  which is best used for testing and development. It is a simplified implementation designed specifically for local development environments, providing the necessary functionality to establish audio connections between your application and the browser without requiring complex infrastructure. For production deployments with scale, consider using [DailyTransport](https://docs.pipecat.ai/server/services/transport/daily)  for global, low-latency infrastructure.
+In this workshop, you can use [SmallWebRTCTransport](https://docs.pipecat.ai/server/services/transport/small-webrtc) if you're running locally. It is a simplified implementation designed specifically for local development environments, providing the necessary functionality to establish audio connections between your application and the browser without requiring complex infrastructure.
 
-Understanding the Imported Components
+If you're running in the VS Code cloud environment, you can use [DailyTransport](https://docs.pipecat.ai/server/services/transport/daily). Daily provides global, low-latency WebRTC infrastructure that's great for production deployments at scale.
+
+
+### Understanding the Imported Components
 
 The imports above include several key components from the Pipecat framework that work together to build a voice AI agent:
 
@@ -112,30 +116,10 @@ Now you'll implement the main function that will run your voice agent:
 1. Add the `run_bot` function to your `agent.py` file:
     
     ```python
-    async def run_bot(webrtc_connection: SmallWebRTCConnection, _: argparse.Namespace):
+    async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         logger.info(f"Starting bot")
-    
-        # Initialize the SmallWebRTCTransport with the connection
-        transport = SmallWebRTCTransport(
-            webrtc_connection=webrtc_connection,
-            params=TransportParams(
-                audio_in_enabled=True,
-                audio_in_sample_rate=16000,
-                audio_out_enabled=True,
-                camera_in_enabled=False,
-                vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.8)),
-            ),
-        )
     ```
-    
-    The **Voice Activity Detection (VAD)** analyzer helps detect when the user has finished speaking, with a silence threshold of 0.8 seconds.
-    
 
-### Understanding VAD and Silero
-
-- _Voice Activity Detection (VAD)_ is a technology used to detect the presence or absence of human speech in audio. In voice AI applications, VAD is crucial for determining when a user has started or stopped speaking, allowing the system to process speech input at appropriate times.
-    
-- _Silero VAD_ is a specific implementation of voice activity detection that uses deep learning models to accurately detect speech segments in audio streams. It's particularly effective at distinguishing between speech and background noise, making it ideal for real-time voice applications. The `stop_secs` parameter (set to 0.8 seconds in our code) defines how long the system should wait after detecting silence before considering that the user has finished speaking.
     
 
 ## Congratulations!
