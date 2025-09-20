@@ -1,4 +1,4 @@
-pipecat-ai[webrtc,daily,silero,aws-nova-sonic]==0.0.85
+pipecat-ai[webrtc,daily,silero,aws-nova-sonic,deepgram]==0.0.85
 pipecat-ai-small-webrtc-prebuilt
 python-dotenv
 aioboto3
