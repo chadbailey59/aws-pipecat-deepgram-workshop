@@ -21,7 +21,10 @@ from pipecat.services.aws.llm import AWSBedrockLLMService
 from pipecat.services.aws.stt import AWSTranscribeSTTService
 from pipecat.services.aws.tts import AWSPollyTTSService
 from pipecat.services.aws_nova_sonic import AWSNovaSonicLLMService
+from pipecat.services.deepgram.stt import DeepgramSTTService, LiveOptions
+from pipecat.services.deepgram.tts import DeepgramTTSService
 from pipecat.services.llm_service import FunctionCallParams
+from pipecat.transcriptions.language import Language
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
 
@@ -204,12 +207,23 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         f"{AWSNovaSonicLLMService.AWAIT_TRIGGER_ASSISTANT_RESPONSE_INSTRUCTION}"
     )
 
-    # Create the AWS Nova Sonic LLM service
-    llm = AWSNovaSonicLLMService(
-        secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-        access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        region=os.getenv("AWS_REGION", "us-east-1"),
-        voice_id="tiffany",  # matthew, tiffany, amy
+    stt = DeepgramSTTService(
+        api_key=os.getenv("DEEPGRAM_API_KEY"),
+        live_options=LiveOptions(
+            model="nova-3-general", language=Language.EN, smart_format=True
+        ),
+    )
+
+    tts = DeepgramTTSService(
+        api_key=os.getenv("DEEPGRAM_API_KEY"),
+        voice="aura-2-arcas-en",
+        sample_rate=24000,
+        encoding="linear16",
+    )
+
+    llm = AWSBedrockLLMService(
+        aws_region="us-east-1",
+        model="us.anthropic.claude-3-5-haiku-20241022-v1:0",
     )
 
     # Register the single search function
@@ -232,8 +246,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     pipeline = Pipeline(
         [
             transport.input(),
+            stt,
             context_aggregator.user(),
             llm,
+            tts,
             transport.output(),
             context_aggregator.assistant(),
         ]

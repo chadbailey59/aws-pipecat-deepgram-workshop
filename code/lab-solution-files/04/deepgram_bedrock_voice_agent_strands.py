@@ -1,4 +1,5 @@
 # bedrock_voice_agent.py
+# bedrock_voice_agent.py
 import argparse
 import os
 from datetime import datetime
@@ -10,6 +11,7 @@ from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -21,9 +23,14 @@ from pipecat.services.aws.llm import AWSBedrockLLMService
 from pipecat.services.aws.stt import AWSTranscribeSTTService
 from pipecat.services.aws.tts import AWSPollyTTSService
 from pipecat.services.aws_nova_sonic import AWSNovaSonicLLMService
+from pipecat.services.deepgram.stt import DeepgramSTTService, LiveOptions
+from pipecat.services.deepgram.tts import DeepgramTTSService
 from pipecat.services.llm_service import FunctionCallParams
+from pipecat.transcriptions.language import Language
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.transports.daily.transport import DailyParams
+from strands import Agent, tool
+from strands.models import BedrockModel
 
 # Load environment variables
 load_dotenv(override=True)
@@ -105,9 +112,9 @@ class BedrockKnowledgeBaseClient:
                 )
 
                 if content:
-                    # Show more content for claim-related queries
+                    # Show full content for claim-related queries to include all notes
                     content_length = (
-                        400
+                        1000
                         if any(keyword in query.lower() for keyword in ["claim", "id"])
                         else 200
                     )
@@ -130,92 +137,142 @@ class BedrockKnowledgeBaseClient:
             return "I'm sorry, something went wrong while processing your request."
 
 
-# Initialize Bedrock client
-bedrock_client = BedrockKnowledgeBaseClient(KNOWLEDGE_BASE_ID)
-
-
-async def search_knowledge_base(params: FunctionCallParams):
-    """Single function to search Bedrock Knowledge Base for any query or claim ID"""
-    query = params.arguments.get("query", "")
-
-    if not query:
-        await params.result_callback(
-            {
-                "error": "No query provided",
-                "response": "Please provide a question or claim ID to search the knowledge base.",
-            }
-        )
-        return
-
-    logger.info(f"Searching knowledge base for: {query}")
-
-    try:
-        # Use the knowledge base client to search
-        response_text = await bedrock_client.query_knowledge_base(query)
-
-        await params.result_callback(
-            {
-                "query": query,
-                "response": response_text,
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "knowledge_base_id": KNOWLEDGE_BASE_ID,
-            }
+class StrandsAgent:
+    def __init__(self):
+        self.session = boto3.Session(
+            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+            region_name=os.getenv("AWS_REGION", "us-east-1"),
         )
 
-    except Exception as e:
-        logger.error(f"Error searching for {query}: {e}")
-        await params.result_callback(
-            {
-                "query": query,
-                "response": f"I encountered an error while searching for '{query}'. Please try again.",
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "knowledge_base_id": KNOWLEDGE_BASE_ID,
-            }
+        self.bedrock_model = BedrockModel(
+            model_id="amazon.nova-lite-v1:0", boto_session=self.session
+        )
+        self.bedrock_client = BedrockKnowledgeBaseClient(KNOWLEDGE_BASE_ID)
+
+        self.agent = Agent(
+            tools=[self.search_knowledge_base, self.general_query],
+            model=self.bedrock_model,
+            system_prompt="You are a claim assistant. Search for EXACT claim IDs only. When users say 'claim ID 1', search for 'claim ID 1' specifically, not '1234'. When they say 'claim ID 1234', search for 'claim ID 1234' specifically. Use general_query for non-claim questions.",
         )
 
+    @tool
+    async def search_knowledge_base(self, query: str) -> str:
+        """Search for specific claim information in knowledge base"""
+        logger.info(f"Searching KnowledgeBase: {query}")
+        return await self.bedrock_client.query_knowledge_base(query)
 
-# Define the single search function schema
+    @tool
+    async def general_query(self, question: str) -> str:
+        """Answer general questions directly using the model"""
+        logger.info(f"Answering general question: {question}")
+        try:
+            # Use the Bedrock model directly for general questions
+            response = await self.bedrock_model.generate_async(
+                messages=[{"role": "user", "content": question}], max_tokens=200
+            )
+            return response.content
+        except Exception as e:
+            logger.error(f"Error with general query: {e}")
+            return "I can help answer general questions. What would you like to know?"
+
+    def process_query(self, user_input: str) -> str:
+        """Process user input through the Strands agent"""
+        try:
+            response = self.agent(user_input)
+            return str(response)
+        except Exception as e:
+            logger.error(f"Error processing query with StrandsAgent: {e}")
+            return "I'm sorry, I encountered an error processing your request."
+
+
 search_function = FunctionSchema(
     name="search_knowledge_base",
-    description="Search and retrieve information from the Amazon Bedrock Knowledge Base. Use this for any questions about claims, claim IDs, tickets, policy information, or general inquiries.",
-    properties={
-        "query": {
-            "type": "string",
-            "description": "The question, search query, claim ID, or ticket number to search for. Can be numbers like '1234', '3456', or questions like 'what is a claim?'",
-        }
-    },
+    description="Search the knowledge base",
+    properties={"query": {"type": "string"}},
     required=["query"],
 )
 
-# Create tools schema with single function
 tools = ToolsSchema(standard_tools=[search_function])
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
-    logger.info("Starting Bedrock Knowledge Base Voice Agent")
+    logger.info("Starting Bedrock Knowledge Base Voice Agent with Strands")
+
+    strands_agent = StrandsAgent()
+
+    stt = DeepgramSTTService(
+        api_key=os.getenv("DEEPGRAM_API_KEY"),
+        live_options=LiveOptions(
+            model="nova-3-general", language=Language.EN, smart_format=True
+        ),
+    )
+
+    tts = DeepgramTTSService(
+        api_key=os.getenv("DEEPGRAM_API_KEY"),
+        voice="aura-2-arcas-en",
+        sample_rate=24000,
+        encoding="linear16",
+    )
+
+    llm = AWSBedrockLLMService(
+        aws_region="us-east-1",
+        model="us.anthropic.claude-3-5-haiku-20241022-v1:0",
+    )
+
+    async def search_knowledge_base(params: FunctionCallParams):
+        query = params.arguments.get("query", "")
+
+        if not query:
+            await params.result_callback(
+                {
+                    "error": "No query provided",
+                    "response": "Please provide a question or claim ID to search the knowledge base.",
+                }
+            )
+            return
+
+        logger.info(f"Using Strands agent for: {query}")
+
+        try:
+            response_text = strands_agent.process_query(query)
+
+            await params.result_callback(
+                {
+                    "query": query,
+                    "response": response_text,
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "knowledge_base_id": KNOWLEDGE_BASE_ID,
+                }
+            )
+
+        except Exception as e:
+            logger.error(f"Error with Strands agent for {query}: {e}")
+            await params.result_callback(
+                {
+                    "query": query,
+                    "response": f"I encountered an error while searching for '{query}'. Please try again.",
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "knowledge_base_id": KNOWLEDGE_BASE_ID,
+                }
+            )
+
+    llm.register_function("search_knowledge_base", search_knowledge_base)
 
     # System instruction for knowledge base integration
     system_instruction = (
-        "You are a helpful AI assistant with access to a specialized knowledge base containing claim information. "
-        "Use the search_knowledge_base function for all queries - whether they are specific claim IDs like '1234', '3456', or general questions. "
+        "You are a helpful AI assistant that can help with claim lookups and general questions. "
+        "For claim-related queries, use the search_knowledge_base function. "
         "When users mention numbers, treat them as claim IDs and search for them directly. "
+        "Search for EXACT claim IDs only: "
+        "- If they say 'claim ID 1', search for 'claim ID 1' specifically "
+        "- If they say 'claim ID 1234', search for 'claim ID 1234' specifically "
+        "For general questions not related to specific claims, you can answer directly without using the search function."
         "For claim estimates, costs, amounts, or any other information, always search for that specific information. "
         "Always provide helpful information about claims when found. "
         f"{AWSNovaSonicLLMService.AWAIT_TRIGGER_ASSISTANT_RESPONSE_INSTRUCTION}"
     )
 
-    # Create the AWS Nova Sonic LLM service
-    llm = AWSNovaSonicLLMService(
-        secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-        access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-        region=os.getenv("AWS_REGION", "us-east-1"),
-        voice_id="tiffany",  # matthew, tiffany, amy
-    )
-
-    # Register the single search function
-    llm.register_function("search_knowledge_base", search_knowledge_base)
-
-    # Set up context and context management
     context = OpenAILLMContext(
         messages=[
             {"role": "system", "content": system_instruction},
@@ -232,8 +289,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     pipeline = Pipeline(
         [
             transport.input(),
+            stt,
             context_aggregator.user(),
             llm,
+            tts,
             transport.output(),
             context_aggregator.assistant(),
         ]
